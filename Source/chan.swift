@@ -113,9 +113,28 @@ public class Chan<T> : SequenceType {
         }
     }
 
+  public func receive(until: NSDate) -> (msg : T?, closed : Bool, ready : Bool) {
+    cond.mutex.lock()
+    defer { cond.mutex.unlock() }
+    while true {
+      if msgs.count > 0 {
+        let msg = msgs.removeAtIndex(0)
+        broadcast()
+        return (msg as? T, false, true)
+      }
+      if closed {
+        return (nil, true, true)
+      }
+      let remainingTimeInterval = until.timeIntervalSinceNow
+      if case .TimedOut = cond.wait(remainingTimeInterval)  {
+        return (nil, false, false)
+      }
+    }
+  }
+
     public typealias Generator = AnyGenerator<T>
     public func generate() -> Generator {
-        return anyGenerator {
+        return AnyGenerator {
             return <-self
         }
     }
